@@ -37,17 +37,6 @@ String cccCLEES = CLEES;
 // Variables for client info
 String clientID;      // Id/name for this specific client, shown i MQTT and router
 
-// Define turnout states
-int NORMAL = 0;
-int REVERSE = 1;
-int UP = 3;
-int DN = 4;
-
-// Temporary
-int tmpCnt = 0;
-int tempCnt = 0;
-int btnState = 0;     // To get two states from a momentary button
-
 // Select which pin will trigger the configuration portal
 // #define TRIGGER_PIN D0
 
@@ -62,7 +51,7 @@ const int nbrSubTopics = 4;
 String subTopic[nbrSubTopics];
 
 // Variable for topics to publish to
-const int nbrPubTopics = 13;
+const int nbrPubTopics = 12;
 String pubTopic[nbrPubTopics];
 String pubTopicContent[nbrPubTopics];
 
@@ -83,17 +72,6 @@ unsigned long signalOneMillis[6];
 String signalOneBlinkState[6];
 
 
-// -----------------------------------------------------
-// Define which pins to use for different actions - Wemos D1 R2 mini clone
-// int btnOnePin = D7;    // Pin for first turnout
-// int ledOneUpPin = D2;
-// int ledOneDnPin = D3;
-// int turnoutOnePin = D4;
-// int btnTwoPin = D5;    // Pin for second turnout
-// int ledTwoUpPin = D6;
-// int ledTwoDnPin = D7;
-// int turnoutTwoPin = D8;
-
 /*
  * Standard setup function
  */
@@ -101,41 +79,33 @@ void setup() {
   // Setup Arduino IDE serial monitor for "debugging"
   Serial.begin(115200);
 
-  // Define build-in LED pin as output
+  // Define pins for signal LEDs
   signalOneLedPin[1] = D1;
-  pinMode(signalOneLedPin[1], OUTPUT);
-  
   signalOneLedPin[2] = D2;
-  pinMode(signalOneLedPin[2], OUTPUT);
-
   signalOneLedPin[3] = D3;
-  pinMode(signalOneLedPin[3], OUTPUT);
-  
   signalOneLedPin[4] = D4;
-  pinMode(signalOneLedPin[4], OUTPUT);
-
   signalOneLedPin[5] = D5;
-  pinMode(signalOneLedPin[5], OUTPUT);
 
-  pinMode(D6, OUTPUT);
-  pinMode(D7, OUTPUT);
-  pinMode(D8, OUTPUT);
+  // Define build-in LED pin as output
+  pinMode(signalOneLedPin[1], OUTPUT);
+  pinMode(signalOneLedPin[2], OUTPUT);
+  pinMode(signalOneLedPin[3], OUTPUT);
+  pinMode(signalOneLedPin[4], OUTPUT);
+  pinMode(signalOneLedPin[5], OUTPUT);
 
 //  pinMode(LED_BUILTIN, OUTPUT);   // For Arduino, Wemos D1 mini
 //  pinMode(btnOnePin, INPUT);
 //  pinMode(btnTwoPin, INPUT);
 
-//  pinMode(TRIGGER_PIN, INPUT);    // Trigger pin for configuration portal
+//  Trigger pin for configuration portal
+//  pinMode(TRIGGER_PIN, INPUT);
 
-  // Set initial state
+  // Set initial state for Signal 1
   digitalWrite(signalOneLedPin[1], LOW);
-  digitalWrite(signalOneLedPin[2], LOW);
+  digitalWrite(signalOneLedPin[2], HIGH);
   digitalWrite(signalOneLedPin[3], LOW);
   digitalWrite(signalOneLedPin[4], LOW);
   digitalWrite(signalOneLedPin[5], LOW);
-  digitalWrite(D6, LOW);
-  digitalWrite(D7, LOW);
-  digitalWrite(D8, LOW);
 
   // Assemble topics to subscribe and publish to
   if (cccCLEES == "1") {
@@ -154,42 +124,38 @@ void setup() {
     pubTopic[0] = "mmrc/"+deviceID+"/$name";
     pubTopicContent[0] = "SJ07 signalkort";
 
-    // The following topic is no longer needed
-    pubTopic[1] = "mmrc/"+deviceID+"/$state";
-    pubTopicContent[1] = "lost";
-
-    pubTopic[2] = "mmrc/"+deviceID+"/$nodes";
-    pubTopicContent[2] = nodeID01+","+nodeID02;
+    pubTopic[1] = "mmrc/"+deviceID+"/$nodes";
+    pubTopicContent[1] = nodeID01+","+nodeID02;
     
-    pubTopic[3] = "mmrc/"+deviceID+"/"+nodeID01+"/$name";
-    pubTopicContent[3] = "Signal 1";
+    pubTopic[2] = "mmrc/"+deviceID+"/"+nodeID01+"/$name";
+    pubTopicContent[2] = "Signal 1";
 
-    pubTopic[4] = "mmrc/"+deviceID+"/"+nodeID01+"/$type";
-    pubTopicContent[4] = "Signal control";
+    pubTopic[3] = "mmrc/"+deviceID+"/"+nodeID01+"/$type";
+    pubTopicContent[3] = "Signal control";
 
-    pubTopic[5] = "mmrc/"+deviceID+"/"+nodeID01+"/$properties";
-    pubTopicContent[5] = "main,slave";
+    pubTopic[4] = "mmrc/"+deviceID+"/"+nodeID01+"/$properties";
+    pubTopicContent[4] = "main,slave";
 
-    pubTopic[6] = "mmrc/"+deviceID+"/"+nodeID01+"/main/$name";
-    pubTopicContent[6] = "Huvudsignal";
+    pubTopic[5] = "mmrc/"+deviceID+"/"+nodeID01+"/main/$name";
+    pubTopicContent[5] = "Huvudsignal";
 
-    pubTopic[7] = "mmrc/"+deviceID+"/"+nodeID01+"/main/$datatype";
-    pubTopicContent[7] = "string";
+    pubTopic[6] = "mmrc/"+deviceID+"/"+nodeID01+"/main/$datatype";
+    pubTopicContent[6] = "string";
 
-    pubTopic[8] = "mmrc/"+deviceID+"/"+nodeID02+"/$name";
-    pubTopicContent[8] = "Signal 2";
+    pubTopic[7] = "mmrc/"+deviceID+"/"+nodeID02+"/$name";
+    pubTopicContent[7] = "Signal 2";
 
-    pubTopic[9] = "mmrc/"+deviceID+"/"+nodeID02+"/$type";
-    pubTopicContent[9] = "Signal control";
+    pubTopic[8] = "mmrc/"+deviceID+"/"+nodeID02+"/$type";
+    pubTopicContent[8] = "Signal control";
 
-    pubTopic[10] = "mmrc/"+deviceID+"/"+nodeID02+"/$properties";
-    pubTopicContent[10] = "main,slave";
+    pubTopic[9] = "mmrc/"+deviceID+"/"+nodeID02+"/$properties";
+    pubTopicContent[9] = "main,slave";
 
-    pubTopic[11] = "mmrc/"+deviceID+"/"+nodeID02+"/main/$name";
-    pubTopicContent[11] = "Huvudsignal";
+    pubTopic[10] = "mmrc/"+deviceID+"/"+nodeID02+"/main/$name";
+    pubTopicContent[10] = "Huvudsignal";
 
-    pubTopic[12] = "mmrc/"+deviceID+"/"+nodeID02+"/main/$datatype";
-    pubTopicContent[12] = "string";
+    pubTopic[11] = "mmrc/"+deviceID+"/"+nodeID02+"/main/$datatype";
+    pubTopicContent[11] = "string";
 
     // Often used publish topics
     pubTopicSignalOneMain = "mmrc/"+deviceID+"/"+nodeID01+"/main";
@@ -197,7 +163,8 @@ void setup() {
     pubTopicSignalOneSlave = "mmrc/"+deviceID+"/"+nodeID01+"/slave";
     pubTopicSignalTwoSlave = "mmrc/"+deviceID+"/"+nodeID02+"/slave";
 
-    pubTopicDeviceState = pubTopic[1];
+    // Device status
+    pubTopicDeviceState = "mmrc/"+deviceID+"/$state";;
     
  }
 
@@ -409,9 +376,9 @@ void mqttCallback(char* topic, byte* payload, unsigned int length) {
       signalOneSet[3] = "off";
       signalOneSet[4] = "blink";
       signalOneSet[5] = "off";
-      signalOneInterval[3] = 100;
-      signalOneInterval[4] = 100;
-      signalOneInterval[5] = 100;
+      signalOneInterval[3] = 10;
+      signalOneInterval[4] = 10;
+      signalOneInterval[5] = 10;
       mqttPublish(pubTopicSignalOneSlave, "vk80", 1);
     }
 
@@ -422,10 +389,11 @@ void mqttCallback(char* topic, byte* payload, unsigned int length) {
       signalOneSet[3] = "blink";
       signalOneSet[4] = "off";
       signalOneSet[5] = "blink";
-      signalOneInterval[3] = 100;
-      signalOneInterval[4] = 100;
-      signalOneInterval[5] = 100;
+      signalOneInterval[3] = 10;
+      signalOneInterval[4] = 10;
+      signalOneInterval[5] = 10;
 
+      // Syncronize blinks
       signalOneBright[5] = signalOneBright[3];
       signalOneBlinkState[5] = signalOneBlinkState[3];
 
@@ -439,9 +407,9 @@ void mqttCallback(char* topic, byte* payload, unsigned int length) {
       signalOneSet[3] = "blink";
       signalOneSet[4] = "off";
       signalOneSet[5] = "off";
-      signalOneInterval[3] = 100;
-      signalOneInterval[4] = 100;
-      signalOneInterval[5] = 100;
+      signalOneInterval[3] = 10;
+      signalOneInterval[4] = 10;
+      signalOneInterval[5] = 10;
       mqttPublish(pubTopicSignalOneSlave, "vstop", 1);
     }
     
@@ -502,10 +470,6 @@ void signalOneChange(String state, int LEDnr) {
     // Dim LED up a little bit
     signalOneBright[LEDnr] = signalOneBright[LEDnr]+30;
 
-    // Debug
-    Serial.print(", brightness = ");
-    Serial.println(signalOneBright[LEDnr]);
-
     // How fast the LED should be turned on
     signalOneInterval[LEDnr] = 15;
 
@@ -516,20 +480,17 @@ void signalOneChange(String state, int LEDnr) {
       signalOneInterval[LEDnr] = 100;
 
       // Debug
-      Serial.print("SignalOne, LED ");
-      Serial.print(LEDnr);
-      Serial.println(" - ON");
-
+//      Serial.println(" - ON");
     }
+
+    // Debug
+    Serial.print(", brightness = ");
+    Serial.println(signalOneBright[LEDnr]);
   }
 
   if (state == "off") {
     // Dim LED down a little bit
     signalOneBright[LEDnr] = signalOneBright[LEDnr]-30;
-
-    // Debug
-    Serial.print(", brightness = ");
-    Serial.println(signalOneBright[LEDnr]);
 
     // How fast the LED should be turned off
     signalOneInterval[LEDnr] = 10;
@@ -540,10 +501,12 @@ void signalOneChange(String state, int LEDnr) {
       signalOneSet[LEDnr] = "";
 
     // Debug
-    Serial.print("SignalOne, LED ");
-    Serial.print(LEDnr);
-    Serial.println(" - OFF");
+//    Serial.println(" - OFF");
     }
+
+    // Debug
+    Serial.print(", brightness = ");
+    Serial.println(signalOneBright[LEDnr]);
   }
 
   // Set LED brightness
@@ -557,15 +520,23 @@ void signalOneChange(String state, int LEDnr) {
 
 void signalOneBlink(int LEDnr) {
 
-    // Debug
-//    Serial.println("");
-//    Serial.println("## Blink");
-//    Serial.println(signalOneBlinkState[LEDnr]);
-//Serial.println(signalOneBright[LEDnr]);
-//    Serial.println(signalOneInterval[LEDnr]);
-//    Serial.println(signalOneLedPin[LEDnr]);
-//    Serial.println(signalOneBlinkState[LEDnr]);
+  // Always start first blink with dimming up
+  if (signalOneBlinkState[LEDnr] == "") {
+    signalOneBlinkState[LEDnr] = "up";
+  }
 
+    // Debug
+/*    Serial.print("Signal state = ");
+    Serial.print(signalOneBlinkState[LEDnr]);
+    Serial.print(", LED no = ");
+    Serial.print(LEDnr);
+    Serial.print(", LED pin = ");
+    Serial.print(signalOneLedPin[LEDnr]);
+    Serial.print(", brightness = ");
+    Serial.print(signalOneBright[LEDnr]);
+    Serial.print(", interval = ");
+    Serial.println(signalOneInterval[LEDnr]);
+*/
   // Check if LED is dimming up
   if (signalOneBlinkState[LEDnr] == "up") {
 
@@ -656,31 +627,6 @@ void loop()
       delay(5000);
     }
     Serial.println("Connected...yeey :)");
-  }
-*/
-
-  // -----------------------------------------------------
-  // Check for button ONE press
-/*  int btnOnePress = digitalRead(btnOnePin);
-  if (btnOnePress == LOW) {
-    Serial.println("Button ONE pressed");
-    delay(400);
-
-    // Start moving turnout ONE
-    signalOneSet[1] = "bĺink";
-    signalOneInterval[1] = 120;
-  }
-
-  // -----------------------------------------------------
-  // Check for button TWO press
-  int btnTwoPress = digitalRead(btnTwoPin);
-  if (btnTwoPress == LOW) {
-    Serial.println("Button TWO pressed");
-    delay(300);
-
-    // Start moving turnout TWO
-    signalOneSet[1] = "off";
-    signalOneInterval[1] = 150;
   }
 */
 
