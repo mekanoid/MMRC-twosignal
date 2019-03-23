@@ -2,14 +2,14 @@
  __  __ __  __ ___  ___
 |  \/  |  \/  | _ \/ __|
 | |\/| | |\/| |   / (__
-|_|  |_|_|  |_|_|_\\___| - Two turnout
+|_|  |_|_|  |_|_|_\\___| - Two signal
 ````
 
 Modern Model Railroad Control - Software for ESP866 wifi capable Arduino and clones.
 
 
-## Two turnout
-To control two signals from a separate turnouts. You have to set the signals topic in the turnout client settings.
+## Two signal
+To control two signals from two separate turnouts. You have to set the signals topic in the turnout client settings.
 Att the moment this client can only control ONE signal.
 
 ## Client pin use
