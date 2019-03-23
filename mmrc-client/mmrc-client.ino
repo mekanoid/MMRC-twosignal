@@ -25,30 +25,60 @@ PubSubClient client(wifiClient);
 
 // ------------------------------------------------------------
 // Convert settings in MMRCsettings.h to constants and variables
-const char* mqttBrokerIP = IP;
+const char* mqttBrokerIP = BROKERIP;
+const char* mqttBrokerPort = BROKERPORT;
 String deviceID = DEVICEID;
-String nodeID01 = NODEID01;
-String nodeID02 = NODEID02;
-String cccCLEES = CLEES;
+String deviceName = DEVICENAME;
+
+// Node one settings
+String node01Id = NODE01ID;
+String node01Name = NODE01NAME;
+String node01Type = NODE01TYPE;
+String node01Prop01 = NODE01PROP01;
+String node01Prop01Name = NODE01PROP01NAME;
+String node01Prop01Datatype = NODE01PROP01DATATYPE;
+String node01Prop02 = NODE01PROP02;
+String node01Prop02Name = NODE01PROP02NAME;
+String node01Prop02Datatype = NODE01PROP02DATATYPE;
+
+int signalOneType = atoi(SIGNAL01TYPE);
+String signalOneSlaveListen = SIGNAL01LISTEN;
+
+// Node two settings
+String node02Id = NODE02ID;
+String node02Name = NODE02NAME;
+String node02Type = NODE02TYPE;
+String node02Prop01 = NODE02PROP01;
+String node02Prop01Name = NODE02PROP01NAME;
+String node02Prop01Datatype = NODE02PROP01DATATYPE;
+String node02Prop02 = NODE02PROP02;
+String node02Prop02Name = NODE02PROP02NAME;
+String node02Prop02Datatype = NODE02PROP02DATATYPE;
+
+int signalTwoType = atoi(SIGNAL02TYPE);
+String signalTwoSlaveListen = SIGNAL02LISTEN;
 
 // ------------------------------------------------------------
-// Various variable definitions
+// Define various variables
 
 // Variables for client info
 String clientID;      // Id/name for this specific client, shown i MQTT and router
+
+// Variable to detect that the client just started
+int deviceStart = 1;
 
 // Select which pin will trigger the configuration portal
 // #define CONFIG_PIN D0
 
 // ------------------------------------------------------------
-// Topic variables
+// Define topic variables
 
 // Variable for topics to subscribe to
 const int nbrSubTopics = 4;
 String subTopic[nbrSubTopics];
 
 // Variable for topics to publish to
-const int nbrPubTopics = 12;
+const int nbrPubTopics = 16;
 String pubTopic[nbrPubTopics];
 String pubTopicContent[nbrPubTopics];
 
@@ -60,8 +90,9 @@ String pubTopicSignalTwoSlave;
 String pubTopicDeviceState;
 
 // ------------------------------------------------------------
-// Signal ONE variables
-int signalOneType = 5;
+// Define signal variables
+
+// Signal ONE
 String signalOneState = "stop";
 int signalOneBright[6];
 String signalOneSet[6];
@@ -69,6 +100,17 @@ int signalOneLedPin[6];
 unsigned long signalOneInterval[6];
 unsigned long signalOneMillis[6];
 String signalOneBlinkState[6];
+
+// Signal Two
+/*
+String signalTwoState = "stop";
+int signalTwoBright[6];
+String signalTwoSet[6];
+int signalTwoLedPin[6];
+unsigned long signalTwoInterval[6];
+unsigned long signalTwoMillis[6];
+String signalTwoBlinkState[6];
+*/
 
 
 /* *****************************************************
@@ -78,83 +120,119 @@ void setup() {
   // Setup Arduino IDE serial monitor for "debugging"
   Serial.begin(115200);
 
+  // ------------------------------------------------------------
+  // Setup for pin use
+
   // Define pins for signal LEDs
   signalOneLedPin[1] = D5;
   signalOneLedPin[2] = D6;
   signalOneLedPin[3] = D7;
-  signalOneLedPin[4] = D1;
-  signalOneLedPin[5] = D2; 
-//  signalOneLedPin[4] = 1; // Wemos Tx
-//  signalOneLedPin[5] = 3; // Wemos Rx
+  signalOneLedPin[4] = D1;  // Temporary to enable Serial monitor
+  signalOneLedPin[5] = D2;  // Temporary to enable Serial monitor
+//  signalOneLedPin[4] = 1; // Wemos Tx - disables Serial monitor
+//  signalOneLedPin[5] = 3; // Wemos Rx - disables Serial monitor
 /*
   signalTwoLedPin[1] = D1;
   signalTwoLedPin[2] = D2;
   signalTwoLedPin[3] = D3;
   signalTwoLedPin[4] = D4;
 */
-  // Define build-in LED pin as output
+
+  // Define pins as output
   pinMode(signalOneLedPin[1], OUTPUT);
   pinMode(signalOneLedPin[2], OUTPUT);
   pinMode(signalOneLedPin[3], OUTPUT);
   pinMode(signalOneLedPin[4], OUTPUT);
   pinMode(signalOneLedPin[5], OUTPUT);
+/*
+  pinMode(signalTwoLedPin[1], OUTPUT);
+  pinMode(signalTwoLedPin[2], OUTPUT);
+  pinMode(signalTwoLedPin[3], OUTPUT);
+  pinMode(signalTwoLedPin[4], OUTPUT);
+*/
 
 //  Trigger pin for configuration portal
 //  pinMode(CONFIG_PIN, INPUT);
 
   // Set initial state for Signal 1
   digitalWrite(signalOneLedPin[1], LOW);
-  digitalWrite(signalOneLedPin[2], HIGH);
+  digitalWrite(signalOneLedPin[2], LOW);
   digitalWrite(signalOneLedPin[3], LOW);
   digitalWrite(signalOneLedPin[4], LOW);
   digitalWrite(signalOneLedPin[5], LOW);
+/*
+  digitalWrite(signalTwoLedPin[1], LOW);
+  digitalWrite(signalTwoLedPin[2], LOW);
+  digitalWrite(signalTwoLedPin[3], LOW);
+  digitalWrite(signalTwoLedPin[4], LOW);
+*/
 
-  // Assemble topics to subscribe and publish to
+  // ------------------------------------------------------------
+  // Set up topics to subscribe and publish to
 
   // Subscribe
-  subTopic[0] = "mmrc/"+deviceID+"/"+nodeID01+"/main/set";
-  subTopic[1] = "mmrc/"+deviceID+"/"+nodeID02+"/main/set";
-  subTopic[2] = "mmrc/pkin-sj77/signal1/main";
-  subTopic[3] = "mmrc/pkin-sj77/signal2/main";
+  subTopic[0] = "mmrc/"+deviceID+"/"+node01Id+"/"+node01Prop01+"/set";
+  subTopic[1] = "mmrc/"+deviceID+"/"+node02Id+"/main/set";
+  subTopic[2] = signalOneSlaveListen;
+  subTopic[3] = signalTwoSlaveListen;
 
   // Publish - device
   pubTopic[0] = "mmrc/"+deviceID+"/$name";
-  pubTopicContent[0] = "SJ07 signalkort";
+  pubTopicContent[0] = deviceName;
   pubTopic[1] = "mmrc/"+deviceID+"/$nodes";
-  pubTopicContent[1] = nodeID01+","+nodeID02;
+  pubTopicContent[1] = node01Id+","+node02Id;
     
-  // Publish - node
-  pubTopic[2] = "mmrc/"+deviceID+"/"+nodeID01+"/$name";
-  pubTopicContent[2] = "Signal 1";
-  pubTopic[3] = "mmrc/"+deviceID+"/"+nodeID01+"/$type";
-  pubTopicContent[3] = "Signal control";
-  pubTopic[4] = "mmrc/"+deviceID+"/"+nodeID01+"/$properties";
-  pubTopicContent[4] = "main,slave";
-  pubTopic[5] = "mmrc/"+deviceID+"/"+nodeID01+"/main/$name";
-  pubTopicContent[5] = "Huvudsignal";
-  pubTopic[6] = "mmrc/"+deviceID+"/"+nodeID01+"/main/$datatype";
-  pubTopicContent[6] = "string";
+  // Publish - node 01
+  pubTopic[2] = "mmrc/"+deviceID+"/"+node01Id+"/$name";
+  pubTopicContent[2] = node01Name;
+  pubTopic[3] = "mmrc/"+deviceID+"/"+node01Id+"/$type";
+  pubTopicContent[3] = node01Type;
+  pubTopic[4] = "mmrc/"+deviceID+"/"+node01Id+"/$properties";
+  pubTopicContent[4] = node01Prop01+","+node01Prop02;
+  
+  // Publish - node 01 - property 01
+  pubTopic[5] = "mmrc/"+deviceID+"/"+node01Id+"/"+node01Prop01+"/$name";
+  pubTopicContent[5] = node01Prop01Name;
+  pubTopic[6] = "mmrc/"+deviceID+"/"+node01Id+"/"+node01Prop01+"/$datatype";
+  pubTopicContent[6] = node01Prop01Datatype;
 
-  // Publish - node
-  pubTopic[7] = "mmrc/"+deviceID+"/"+nodeID02+"/$name";
-  pubTopicContent[7] = "Signal 2";
-  pubTopic[8] = "mmrc/"+deviceID+"/"+nodeID02+"/$type";
-  pubTopicContent[8] = "Signal control";
-  pubTopic[9] = "mmrc/"+deviceID+"/"+nodeID02+"/$properties";
-  pubTopicContent[9] = "main,slave";
-  pubTopic[10] = "mmrc/"+deviceID+"/"+nodeID02+"/main/$name";
-  pubTopicContent[10] = "Huvudsignal";
-  pubTopic[11] = "mmrc/"+deviceID+"/"+nodeID02+"/main/$datatype";
-  pubTopicContent[11] = "string";
+  // Publish - node 01 - property 02
+  pubTopic[7] = "mmrc/"+deviceID+"/"+node01Id+"/"+node01Prop02+"/$name";
+  pubTopicContent[7] = node01Prop02Name;
+  pubTopic[8] = "mmrc/"+deviceID+"/"+node01Id+"/"+node01Prop02+"/$datatype";
+  pubTopicContent[8] = node01Prop02Datatype;
+
+  // Publish - node 02
+  pubTopic[9] = "mmrc/"+deviceID+"/"+node02Id+"/$name";
+  pubTopicContent[9] = node02Name;
+  pubTopic[10] = "mmrc/"+deviceID+"/"+node02Id+"/$type";
+  pubTopicContent[10] = node02Type;
+  pubTopic[11] = "mmrc/"+deviceID+"/"+node02Id+"/$properties";
+  pubTopicContent[11] = node02Prop01+","+node02Prop02;
+
+  // Publish - node 02 - property 01
+  pubTopic[12] = "mmrc/"+deviceID+"/"+node02Id+"/"+node02Prop01+"/$name";
+  pubTopicContent[12] = node02Prop01Name;
+  pubTopic[13] = "mmrc/"+deviceID+"/"+node02Id+"/"+node02Prop01+"/$datatype";
+  pubTopicContent[13] = node02Prop01Datatype;
+
+  // Publish - node 02 - property 02
+  pubTopic[14] = "mmrc/"+deviceID+"/"+node02Id+"/"+node02Prop02+"/$name";
+  pubTopicContent[14] = node02Prop02Name;
+  pubTopic[15] = "mmrc/"+deviceID+"/"+node02Id+"/"+node02Prop02+"/$datatype";
+  pubTopicContent[15] = node02Prop02Datatype;
 
   // Often used publish topics
-  pubTopicSignalOneMain = "mmrc/"+deviceID+"/"+nodeID01+"/main";
-  pubTopicSignalTwoMain = "mmrc/"+deviceID+"/"+nodeID02+"/main";
-  pubTopicSignalOneSlave = "mmrc/"+deviceID+"/"+nodeID01+"/slave";
-  pubTopicSignalTwoSlave = "mmrc/"+deviceID+"/"+nodeID02+"/slave";
+  pubTopicSignalOneMain = "mmrc/"+deviceID+"/"+node01Id+"/"+node01Prop01;
+  pubTopicSignalTwoMain = "mmrc/"+deviceID+"/"+node02Id+"/"+node02Prop01;
+  pubTopicSignalOneSlave = "mmrc/"+deviceID+"/"+node01Id+"/"+node01Prop02;
+  pubTopicSignalTwoSlave = "mmrc/"+deviceID+"/"+node02Id+"/"+node02Prop02;
 
   // Device status
   pubTopicDeviceState = "mmrc/"+deviceID+"/$state";;
+
+  // ------------------------------------------------------------
+  // Network & MQTT setup
 
   // Unique MQTT name for this client
   clientID = "MMRC "+deviceID;
@@ -601,7 +679,6 @@ void signalOneBlink(int LEDnr) {
  */
 void loop()
 {
-
   unsigned long currentMillis = millis();
 
   // ------------------------------------------------------------
@@ -617,6 +694,15 @@ void loop()
   // ------------------------------------------------------------
   // Wait for incoming MQTT messages
   client.loop();
+
+  // Set signals initial state
+  if (deviceStart == 1) {
+    Serial.println("Device started");
+    deviceStart = 0;
+    signalOneChange("on", 2);
+    signalOneState = "stop";
+    mqttPublish(pubTopicSignalOneMain, signalOneState, 1);
+  }
 
 /*
   // Trigger configuration portal
