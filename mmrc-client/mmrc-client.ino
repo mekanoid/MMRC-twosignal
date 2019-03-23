@@ -1,6 +1,6 @@
 // ------------------------------------------------------------
 //
-//    MMRC client for controlling two signals
+//    MMRC client for controlling two model railroad signals
 //    Copyright (C) 2019 Peter Kindström
 //
 //    This program is free software: you can redistribute
@@ -23,7 +23,7 @@
 WiFiClient wifiClient;
 PubSubClient client(wifiClient);
 
-// -----------------------------------------------------
+// ------------------------------------------------------------
 // Convert settings in MMRCsettings.h to constants and variables
 const char* mqttBrokerIP = IP;
 String deviceID = DEVICEID;
@@ -31,19 +31,16 @@ String nodeID01 = NODEID01;
 String nodeID02 = NODEID02;
 String cccCLEES = CLEES;
 
-// -----------------------------------------------------
+// ------------------------------------------------------------
 // Various variable definitions
 
 // Variables for client info
 String clientID;      // Id/name for this specific client, shown i MQTT and router
 
 // Select which pin will trigger the configuration portal
-// #define TRIGGER_PIN D0
+// #define CONFIG_PIN D0
 
-// Uncomment next line to use built in LED on NodeMCU (which is pin D4)
-// #define LED_BUILTIN D4
-
-// -----------------------------------------------------
+// ------------------------------------------------------------
 // Topic variables
 
 // Variable for topics to subscribe to
@@ -62,8 +59,10 @@ String pubTopicSignalTwoMain;
 String pubTopicSignalTwoSlave;
 String pubTopicDeviceState;
 
-// -----------------------------------------------------
+// ------------------------------------------------------------
 // Signal ONE variables
+int signalOneType = 5;
+String signalOneState = "stop";
 int signalOneBright[6];
 String signalOneSet[6];
 int signalOneLedPin[6];
@@ -72,20 +71,27 @@ unsigned long signalOneMillis[6];
 String signalOneBlinkState[6];
 
 
-/*
- * Standard setup function
+/* *****************************************************
+ *  Standard setup function
  */
 void setup() {
   // Setup Arduino IDE serial monitor for "debugging"
   Serial.begin(115200);
 
   // Define pins for signal LEDs
-  signalOneLedPin[1] = D1;
-  signalOneLedPin[2] = D2;
-  signalOneLedPin[3] = D3;
-  signalOneLedPin[4] = D4;
-  signalOneLedPin[5] = D5;
-
+  signalOneLedPin[1] = D5;
+  signalOneLedPin[2] = D6;
+  signalOneLedPin[3] = D7;
+  signalOneLedPin[4] = D1;
+  signalOneLedPin[5] = D2; 
+//  signalOneLedPin[4] = 1; // Wemos Tx
+//  signalOneLedPin[5] = 3; // Wemos Rx
+/*
+  signalTwoLedPin[1] = D1;
+  signalTwoLedPin[2] = D2;
+  signalTwoLedPin[3] = D3;
+  signalTwoLedPin[4] = D4;
+*/
   // Define build-in LED pin as output
   pinMode(signalOneLedPin[1], OUTPUT);
   pinMode(signalOneLedPin[2], OUTPUT);
@@ -93,12 +99,8 @@ void setup() {
   pinMode(signalOneLedPin[4], OUTPUT);
   pinMode(signalOneLedPin[5], OUTPUT);
 
-//  pinMode(LED_BUILTIN, OUTPUT);   // For Arduino, Wemos D1 mini
-//  pinMode(btnOnePin, INPUT);
-//  pinMode(btnTwoPin, INPUT);
-
 //  Trigger pin for configuration portal
-//  pinMode(TRIGGER_PIN, INPUT);
+//  pinMode(CONFIG_PIN, INPUT);
 
   // Set initial state for Signal 1
   digitalWrite(signalOneLedPin[1], LOW);
@@ -108,79 +110,61 @@ void setup() {
   digitalWrite(signalOneLedPin[5], LOW);
 
   // Assemble topics to subscribe and publish to
-  if (cccCLEES == "1") {
-    deviceID = "clees";
-// CLEES support not yet implemented
-//    subTopic[0] = deviceID+"/"+cccModule+"/cmd/turnout/"+cccObject;
-//    pubTopic[0] = deviceID+"/"+cccModule+"/rpt/turnout"+cccObject;
-  } else {
-    // Subscribe
-    subTopic[0] = "mmrc/"+deviceID+"/"+nodeID01+"/main/set";
-    subTopic[1] = "mmrc/"+deviceID+"/"+nodeID02+"/main/set";
-    subTopic[2] = "mmrc/"+deviceID+"/"+nodeID01+"/slave/set";
-    subTopic[3] = "mmrc/"+deviceID+"/"+nodeID02+"/slave/set";
 
-    // Publish
-    pubTopic[0] = "mmrc/"+deviceID+"/$name";
-    pubTopicContent[0] = "SJ07 signalkort";
+  // Subscribe
+  subTopic[0] = "mmrc/"+deviceID+"/"+nodeID01+"/main/set";
+  subTopic[1] = "mmrc/"+deviceID+"/"+nodeID02+"/main/set";
+  subTopic[2] = "mmrc/pkin-sj77/signal1/main";
+  subTopic[3] = "mmrc/pkin-sj77/signal2/main";
 
-    pubTopic[1] = "mmrc/"+deviceID+"/$nodes";
-    pubTopicContent[1] = nodeID01+","+nodeID02;
+  // Publish - device
+  pubTopic[0] = "mmrc/"+deviceID+"/$name";
+  pubTopicContent[0] = "SJ07 signalkort";
+  pubTopic[1] = "mmrc/"+deviceID+"/$nodes";
+  pubTopicContent[1] = nodeID01+","+nodeID02;
     
-    pubTopic[2] = "mmrc/"+deviceID+"/"+nodeID01+"/$name";
-    pubTopicContent[2] = "Signal 1";
+  // Publish - node
+  pubTopic[2] = "mmrc/"+deviceID+"/"+nodeID01+"/$name";
+  pubTopicContent[2] = "Signal 1";
+  pubTopic[3] = "mmrc/"+deviceID+"/"+nodeID01+"/$type";
+  pubTopicContent[3] = "Signal control";
+  pubTopic[4] = "mmrc/"+deviceID+"/"+nodeID01+"/$properties";
+  pubTopicContent[4] = "main,slave";
+  pubTopic[5] = "mmrc/"+deviceID+"/"+nodeID01+"/main/$name";
+  pubTopicContent[5] = "Huvudsignal";
+  pubTopic[6] = "mmrc/"+deviceID+"/"+nodeID01+"/main/$datatype";
+  pubTopicContent[6] = "string";
 
-    pubTopic[3] = "mmrc/"+deviceID+"/"+nodeID01+"/$type";
-    pubTopicContent[3] = "Signal control";
+  // Publish - node
+  pubTopic[7] = "mmrc/"+deviceID+"/"+nodeID02+"/$name";
+  pubTopicContent[7] = "Signal 2";
+  pubTopic[8] = "mmrc/"+deviceID+"/"+nodeID02+"/$type";
+  pubTopicContent[8] = "Signal control";
+  pubTopic[9] = "mmrc/"+deviceID+"/"+nodeID02+"/$properties";
+  pubTopicContent[9] = "main,slave";
+  pubTopic[10] = "mmrc/"+deviceID+"/"+nodeID02+"/main/$name";
+  pubTopicContent[10] = "Huvudsignal";
+  pubTopic[11] = "mmrc/"+deviceID+"/"+nodeID02+"/main/$datatype";
+  pubTopicContent[11] = "string";
 
-    pubTopic[4] = "mmrc/"+deviceID+"/"+nodeID01+"/$properties";
-    pubTopicContent[4] = "main,slave";
+  // Often used publish topics
+  pubTopicSignalOneMain = "mmrc/"+deviceID+"/"+nodeID01+"/main";
+  pubTopicSignalTwoMain = "mmrc/"+deviceID+"/"+nodeID02+"/main";
+  pubTopicSignalOneSlave = "mmrc/"+deviceID+"/"+nodeID01+"/slave";
+  pubTopicSignalTwoSlave = "mmrc/"+deviceID+"/"+nodeID02+"/slave";
 
-    pubTopic[5] = "mmrc/"+deviceID+"/"+nodeID01+"/main/$name";
-    pubTopicContent[5] = "Huvudsignal";
+  // Device status
+  pubTopicDeviceState = "mmrc/"+deviceID+"/$state";;
 
-    pubTopic[6] = "mmrc/"+deviceID+"/"+nodeID01+"/main/$datatype";
-    pubTopicContent[6] = "string";
-
-    pubTopic[7] = "mmrc/"+deviceID+"/"+nodeID02+"/$name";
-    pubTopicContent[7] = "Signal 2";
-
-    pubTopic[8] = "mmrc/"+deviceID+"/"+nodeID02+"/$type";
-    pubTopicContent[8] = "Signal control";
-
-    pubTopic[9] = "mmrc/"+deviceID+"/"+nodeID02+"/$properties";
-    pubTopicContent[9] = "main,slave";
-
-    pubTopic[10] = "mmrc/"+deviceID+"/"+nodeID02+"/main/$name";
-    pubTopicContent[10] = "Huvudsignal";
-
-    pubTopic[11] = "mmrc/"+deviceID+"/"+nodeID02+"/main/$datatype";
-    pubTopicContent[11] = "string";
-
-    // Often used publish topics
-    pubTopicSignalOneMain = "mmrc/"+deviceID+"/"+nodeID01+"/main";
-    pubTopicSignalTwoMain = "mmrc/"+deviceID+"/"+nodeID02+"/main";
-    pubTopicSignalOneSlave = "mmrc/"+deviceID+"/"+nodeID01+"/slave";
-    pubTopicSignalTwoSlave = "mmrc/"+deviceID+"/"+nodeID02+"/slave";
-
-    // Device status
-    pubTopicDeviceState = "mmrc/"+deviceID+"/$state";;
-    
- }
-
-  // Unique name for this client
-  if (cccCLEES == "1") {
-    clientID = "CLEES "+deviceID;
-  } else {
-    clientID = "MMRC "+deviceID;
-  }
+  // Unique MQTT name for this client
+  clientID = "MMRC "+deviceID;
 
   // Connect to wifi network
   WiFiManager wifiManager;
 
   // Start the WifiManager for connection to network
   // First parameter is name of access point, second is the password
-  wifiManager.autoConnect("MMRC 2-3 Signal", "1234");
+  wifiManager.autoConnect("MMRC 2-signal", "1234");
 
   // Uncomment the next line to reset wifi settings - for testing purposes
   //wifiManager.resetSettings();
@@ -192,8 +176,8 @@ void setup() {
 }
 
 
-/**
- * (Re)connects to MQTT broker and subscribes/publishes to one or more topics
+/** *****************************************************
+ *  (Re)connects to MQTT broker and subscribes/publishes to one or more topics
  */
 void mqttConnect() {
   char tmpTopic[254];
@@ -265,7 +249,7 @@ void mqttConnect() {
 
 }
 
-/**
+/** *****************************************************
  * Function to handle MQTT messages sent to this device
  */
 void mqttCallback(char* topic, byte* payload, unsigned int length) {
@@ -295,7 +279,8 @@ void mqttCallback(char* topic, byte* payload, unsigned int length) {
       signalOneInterval[1] = 10;
       signalOneInterval[2] = 10;
       signalOneInterval[3] = 10;
-      mqttPublish(pubTopicSignalOneMain, "stop", 1);
+      signalOneState = "stop";
+      mqttPublish(pubTopicSignalOneMain, signalOneState, 1);
     }
 
     // Check för message "Kör 80"
@@ -308,7 +293,8 @@ void mqttCallback(char* topic, byte* payload, unsigned int length) {
       signalOneInterval[1] = 10;
       signalOneInterval[2] = 10;
       signalOneInterval[3] = 10;
-      mqttPublish(pubTopicSignalOneMain, "k80", 1);
+      signalOneState = "k80";
+      mqttPublish(pubTopicSignalOneMain, signalOneState, 1);
     }
 
     // Check för message "Kör 40"
@@ -321,10 +307,12 @@ void mqttCallback(char* topic, byte* payload, unsigned int length) {
       signalOneInterval[1] = 10;
       signalOneInterval[2] = 10;
       signalOneInterval[3] = 10;
-      mqttPublish(pubTopicSignalOneMain, "k40", 1);
+      signalOneState = "k40";
+      mqttPublish(pubTopicSignalOneMain, signalOneState, 1);
     }
+
     // Check för message "Kör 40, varsamhet"
-    if (msg == "k40varsam") {
+    if (msg == "k40varsam" && signalOneType != 2) {
       signalOneSet[1] = "on";
       signalOneSet[2] = "off";
       signalOneSet[3] = "on";
@@ -333,11 +321,23 @@ void mqttCallback(char* topic, byte* payload, unsigned int length) {
       signalOneInterval[1] = 10;
       signalOneInterval[2] = 10;
       signalOneInterval[3] = 10;
-      mqttPublish(pubTopicSignalOneMain, "k40varsam", 1);
+      signalOneState = "k40varsam";
+      mqttPublish(pubTopicSignalOneMain, signalOneState, 1);
+    } else if (msg == "k40varsam" && signalOneType == 2) {
+      signalOneSet[1] = "blink";
+      signalOneSet[2] = "off";
+      signalOneSet[3] = "off";
+      signalOneSet[4] = "off";
+      signalOneSet[5] = "off";
+      signalOneInterval[1] = 10;
+      signalOneInterval[2] = 10;
+      signalOneInterval[3] = 10;
+      signalOneState = "k40varsam";
+      mqttPublish(pubTopicSignalOneMain, signalOneState, 1);
     }
 
     // Check för message "Kör 40, kort väg"
-    if (msg == "k40kort") {
+    if (msg == "k40kort" && signalOneType == 5) {
       signalOneSet[1] = "on";
       signalOneSet[2] = "off";
       signalOneSet[3] = "on";
@@ -348,11 +348,12 @@ void mqttCallback(char* topic, byte* payload, unsigned int length) {
       signalOneInterval[3] = 10;
       signalOneInterval[4] = 10;
       signalOneInterval[5] = 10;
-      mqttPublish(pubTopicSignalOneMain, "k40kort", 1);
+      signalOneState = "k40kort";
+      mqttPublish(pubTopicSignalOneMain, signalOneState, 1);
     }
 
     // Check för message "Kör på sikt"
-    if (msg == "k40sikt") {
+    if (msg == "k40sikt" && signalOneType == 2) {
       signalOneSet[1] = "off";
       signalOneSet[2] = "blink";
       signalOneSet[3] = "off";
@@ -361,16 +362,19 @@ void mqttCallback(char* topic, byte* payload, unsigned int length) {
       signalOneInterval[1] = 10;
       signalOneInterval[2] = 10;
       signalOneInterval[3] = 10;
-      mqttPublish(pubTopicSignalOneMain, "k40sikt", 1);
+      signalOneInterval[4] = 10;
+      signalOneInterval[5] = 10;
+      signalOneState = "k40sikt";
+      mqttPublish(pubTopicSignalOneMain, signalOneState, 1);
     }
 
   }
 
   // Check set command for slave signal ONE
-  if (tpc == subTopic[2]){
+  if (tpc == subTopic[2] && signalOneType > 3){
 
-    // Check för message "Vänta Kör 80"
-    if (msg == "vk80") {
+    // Check för message "Nästa signal Kör 80"
+    if (msg == "k80") {
       signalOneSet[1] = "on";
       signalOneSet[2] = "off";
       signalOneSet[3] = "off";
@@ -379,11 +383,13 @@ void mqttCallback(char* topic, byte* payload, unsigned int length) {
       signalOneInterval[3] = 10;
       signalOneInterval[4] = 10;
       signalOneInterval[5] = 10;
+      signalOneState = "k80";
       mqttPublish(pubTopicSignalOneSlave, "vk80", 1);
     }
 
-    // Check för message "Vänta Kör 40"
-    if (msg == "vk40") {
+    // Check för message "Nästa signal Kör 40"
+    if (msg == "k40" || msg == "k40kort" || msg == "k40varsam") {
+      if (signalOneType == 5) {
       signalOneSet[1] = "on";
       signalOneSet[2] = "off";
       signalOneSet[3] = "blink";
@@ -392,16 +398,18 @@ void mqttCallback(char* topic, byte* payload, unsigned int length) {
       signalOneInterval[3] = 10;
       signalOneInterval[4] = 10;
       signalOneInterval[5] = 10;
+      signalOneState = "k80";
 
       // Syncronize blinks
       signalOneBright[5] = signalOneBright[3];
       signalOneBlinkState[5] = signalOneBlinkState[3];
 
       mqttPublish(pubTopicSignalOneSlave, "vk40", 1);
+      }
     }
 
-    // Check för message "Vänta Stopp"
-    if (msg == "vstop") {
+    // Check för message "Nästa signal Stopp"
+    if (msg == "stop" && signalOneState != "stop") {
       signalOneSet[1] = "on";
       signalOneSet[2] = "off";
       signalOneSet[3] = "blink";
@@ -430,8 +438,8 @@ void mqttCallback(char* topic, byte* payload, unsigned int length) {
 }
 
 
-/**
- * Publish messages to MQTT broker 
+/** *****************************************************
+ *   Publish messages to MQTT broker 
  */
 void mqttPublish(String pbTopic, String pbPayload, boolean retained) {
 
@@ -453,8 +461,8 @@ void mqttPublish(String pbTopic, String pbPayload, boolean retained) {
 }
 
 
-/**
- * signalOneSet
+/** *****************************************************
+ *   signalOneSet
  */
 void signalOneChange(String state, int LEDnr) {
 
@@ -465,7 +473,7 @@ void signalOneChange(String state, int LEDnr) {
   Serial.print(", LED pin = ");
   Serial.print(signalOneLedPin[LEDnr]);
   
-
+  // Fade in signal light
   if (state == "on") {
     // Dim LED up a little bit
     signalOneBright[LEDnr] = signalOneBright[LEDnr]+30;
@@ -483,11 +491,9 @@ void signalOneChange(String state, int LEDnr) {
 //      Serial.println(" - ON");
     }
 
-    // Debug
-    Serial.print(", brightness = ");
-    Serial.println(signalOneBright[LEDnr]);
   }
 
+  // Fade out signal light
   if (state == "off") {
     // Dim LED down a little bit
     signalOneBright[LEDnr] = signalOneBright[LEDnr]-30;
@@ -504,18 +510,20 @@ void signalOneChange(String state, int LEDnr) {
 //    Serial.println(" - OFF");
     }
 
-    // Debug
-    Serial.print(", brightness = ");
-    Serial.println(signalOneBright[LEDnr]);
   }
+
+  // Debug
+  Serial.print(", brightness = ");
+  Serial.println(signalOneBright[LEDnr]);
 
   // Set LED brightness
   analogWrite(signalOneLedPin[LEDnr], signalOneBright[LEDnr]);
 
 }
 
-/**
- * Signal ONE blink LED
+
+/** *****************************************************
+ *   Signal ONE blink LED
  */
 
 void signalOneBlink(int LEDnr) {
@@ -526,7 +534,7 @@ void signalOneBlink(int LEDnr) {
   }
 
     // Debug
-/*    Serial.print("Signal state = ");
+/*  Serial.print("Signal state = ");
     Serial.print(signalOneBlinkState[LEDnr]);
     Serial.print(", LED no = ");
     Serial.print(LEDnr);
@@ -537,6 +545,7 @@ void signalOneBlink(int LEDnr) {
     Serial.print(", interval = ");
     Serial.println(signalOneInterval[LEDnr]);
 */
+
   // Check if LED is dimming up
   if (signalOneBlinkState[LEDnr] == "up") {
 
@@ -576,46 +585,42 @@ void signalOneBlink(int LEDnr) {
     // Set LED brightness
     analogWrite(signalOneLedPin[LEDnr], signalOneBright[LEDnr]);
 
-  // ..else LED is ON
+  // ..or if LED is ON
   } else {
     digitalWrite(signalOneLedPin[LEDnr], HIGH);
     signalOneBlinkState[LEDnr] = "dn";
     signalOneInterval[LEDnr] = 100;
 
-    // Debug
-//    Serial.print("Led ONE blink - ");
-//    Serial.println(signalOneBlinkState[LEDnr]);
   }
-
 
 }
 
 
-/**
- * Main loop
+/** *****************************************************
+ *   Main loop
  */
 void loop()
 {
 
   unsigned long currentMillis = millis();
 
-  // -----------------------------------------------------
-  // -----------------------------------------------------
+  // ------------------------------------------------------------
+  // ------------------------------------------------------------
   // -- Waiting for actions
 
-  // -----------------------------------------------------
+  // ------------------------------------------------------------
   // Check connection to the MQTT broker. If no connection, try to reconnect
   if (!client.connected()) {
     mqttConnect();
   }
 
-  // -----------------------------------------------------
+  // ------------------------------------------------------------
   // Wait for incoming MQTT messages
   client.loop();
 
 /*
   // Trigger configuration portal
-  if (digitalRead(TRIGGER_PIN) == LOW) {
+  if (digitalRead(CONFIG_PIN) == LOW) {
     WiFiManager wifiManager;
     if (!wifiManager.startConfigPortal("MMRC 2-2 Turnout")) {
 
@@ -630,12 +635,12 @@ void loop()
   }
 */
 
-  // -----------------------------------------------------
-  // -----------------------------------------------------
+  // ------------------------------------------------------------
+  // ------------------------------------------------------------
   // -- Multitasking actions
 
 
-  // -----------------------------------------------------
+  // ------------------------------------------------------------
   // Check if it is time to change Signal ONE, Led 1 state
   if(currentMillis - signalOneMillis[1] > signalOneInterval[1] && signalOneSet[1]!="") {
 
@@ -644,7 +649,7 @@ void loop()
       signalOneChange("on", 1);
     } else if (signalOneSet[1] == "off") {
       signalOneChange("off", 1);
-    } else if (signalOneSet[1] == "bĺink") {
+    } else if (signalOneSet[1] == "blink") {
       signalOneBlink(1);
     }
 
@@ -653,8 +658,8 @@ void loop()
 
   }
 
-  // -----------------------------------------------------
-  // Check if it is time to change Signal ONE, Led 1 state
+  // ------------------------------------------------------------
+  // Check if it is time to change Signal ONE, Led 2 state
   if(currentMillis - signalOneMillis[2] > signalOneInterval[2] && signalOneSet[2]!="") {
 
     // Check if we should turn on, turn off or BLINK LED
@@ -662,7 +667,7 @@ void loop()
       signalOneChange("on", 2);
     } else if (signalOneSet[2] == "off") {
       signalOneChange("off", 2);
-    } else if (signalOneSet[2] == "bĺink") {
+    } else if (signalOneSet[2] == "blink") {
       signalOneBlink(2);
     }
 
@@ -671,8 +676,8 @@ void loop()
 
   }
 
-  // -----------------------------------------------------
-  // Check if it is time to change Signal ONE, Led 1 state
+  // ------------------------------------------------------------
+  // Check if it is time to change Signal ONE, Led 3 state
   if(currentMillis - signalOneMillis[3] > signalOneInterval[3] && signalOneSet[3]!="") {
 
     // Check if we should turn on, turn off or BLINK LED
@@ -689,8 +694,8 @@ void loop()
 
   }
 
-  // -----------------------------------------------------
-  // Check if it is time to change Signal ONE, Led 1 state
+  // ------------------------------------------------------------
+  // Check if it is time to change Signal ONE, Led 4 state
   if(currentMillis - signalOneMillis[4] > signalOneInterval[4] && signalOneSet[4]!="") {
 
     // Check if we should turn on, turn off or BLINK LED
@@ -707,8 +712,8 @@ void loop()
 
   }
 
-  // -----------------------------------------------------
-  // Check if it is time to change Signal ONE, Led 1 state
+  // ------------------------------------------------------------
+  // Check if it is time to change Signal ONE, Led 5 state
   if(currentMillis - signalOneMillis[5] > signalOneInterval[5] && signalOneSet[5]!="") {
 
     // Check if we should turn on, turn off or BLINK LED
